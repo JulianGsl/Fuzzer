@@ -44,6 +44,25 @@ void create_tar(struct tar_t *header) {
     fclose(tar);
 }
 
+// Create a TAR file with multiple headers
+void create_multi_tar(struct tar_t *headers, int num_headers) {
+    FILE *tar = fopen("archive.tar", "wb");
+    if (tar == NULL) {
+        perror("Error while trying to create the tar file");
+        return;
+    }
+
+    for(int i = 0; i < num_headers; i++) {
+        calculate_checksum(&headers[i]); 
+        fwrite(&headers[i], sizeof(struct tar_t), 1, tar);
+    }
+
+    char padding[1024] = {0};
+    fwrite(padding, 1, 1024, tar);
+
+    fclose(tar);
+}
+
 // Create a baseline header with valid values and checksum
 void baseline_header(struct tar_t* entry) {
     memset(entry, 0, sizeof(struct tar_t));

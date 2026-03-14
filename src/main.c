@@ -7,7 +7,7 @@
 
 int main(int argc, char* argv[])
 {
-    if (argc < 2) {
+if (argc < 2) {
         printf("Usage: %s <path_to_target>\n", argv[0]);
         return -1;
     }
@@ -15,11 +15,10 @@ int main(int argc, char* argv[])
     // Initialize random seed based on clock
     srand((unsigned int)time(NULL));
 
-    struct tar_t header;
     int crash_found = 0;
     int attempts = 0;
 
-    printf("Starting Generation-Based Fuzzing on %s...\n", argv[1]);
+    printf("Starting Hybrid Generation-Based Fuzzing on %s...\n", argv[1]);
 
     while (!crash_found) {
         attempts++;
@@ -27,13 +26,26 @@ int main(int argc, char* argv[])
             printf("Ran %d generated test cases...\n", attempts);
         }
 
-        // 1. Generer un nouveau header malicieux
-        generate_header(&header);
+        // Tableau pouvant contenir jusqu'à 2 headers
+        struct tar_t headers[2];
+        
+        // Tirage au sort : 1 ou 2 headers (50% de chance chacun)
+        int num_headers = (rand() % 2) + 1; 
 
-        // 2. l'écrire dans le tar
-        create_tar(&header);
+        if (num_headers == 1) {
+            // Stratégie 1 : Un seul fichier (fuzzed)
+            generate_header(&headers[0]);
+        } else {
+            // Stratégie 2 : Deux fichiers (1 appât sain + 1 piège fuzzed)
+            baseline_header(&headers[0]);
+            strncpy(headers[0].name, "appat.txt", 100); 
+            generate_header(&headers[1]);
+        }
 
-        // 3. executer l'extracteur dessus
+        // On génère l'archive avec le bon nombre de fichiers
+        create_multi_tar(headers, num_headers);
+
+        // On exécute l'extracteur dessus
         int result = extractor(argv[1]);
 
         if (result == 1) {
