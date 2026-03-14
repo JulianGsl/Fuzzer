@@ -38,12 +38,38 @@ void create_tar(struct tar_t *headers, int num_headers) {
     for(int i = 0; i < num_headers; i++) {
         calculate_checksum(&headers[i]); 
         fwrite(&headers[i], sizeof(struct tar_t), 1, tar);
+        write_body(tar);
     }
 
     char padding[1024] = {0};
     fwrite(padding, 1, 1024, tar);
 
     fclose(tar);
+}
+
+// Body generator
+void write_body(FILE *tar) {
+    if (rand() % 2 != 0) {
+        return;
+    }
+
+    int data_size = (rand() % 4096) + 1;
+    char *body_data = malloc(data_size);
+    
+    if (body_data != NULL) {
+        generate_random_bytes(body_data, data_size);
+        fwrite(body_data, 1, data_size, tar);
+        free(body_data);
+
+        if (rand() % 4 != 0) { 
+            int remainder = data_size % 512;
+            if (remainder > 0) {
+                int pad_size = 512 - remainder;
+                char pad[512] = {0};
+                fwrite(pad, 1, pad_size, tar);
+            }
+        }
+    }
 }
 
 // Create a baseline header with valid values and checksum
@@ -64,9 +90,6 @@ void baseline_header(struct tar_t* entry) {
 
     calculate_checksum(entry);
 }
-
-
-
 
 void generate_random_bytes(char* buf, size_t size) {
     for (size_t i = 0; i < size; i++) {

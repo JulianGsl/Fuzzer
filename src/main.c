@@ -22,28 +22,48 @@ if (argc < 2) {
 
     while (!crash_found) {
         attempts++;
-        if (attempts % 500 == 0) {
+        if (attempts % 2000 == 0) {
             printf("Ran %d generated test cases...\n", attempts);
         }
 
-        // Tableau pouvant contenir jusqu'à 2 headers
-        struct tar_t headers[2];
+        // On alloue un grand tableau de 100 headers
+        struct tar_t headers[100];
+        int num_headers = 0;
         
-        // Tirage au sort : 1 ou 2 headers (50% de chance chacun)
-        int num_headers = (rand() % 2) + 1; 
+        // Tirage au sort stratégique (Probabilités)
+        int chance = rand() % 100; 
 
-        if (num_headers == 1) {
-            // Stratégie 1 : Un seul fichier (fuzzed)
+        if (chance < 10) {
+            // 10% de chance : 0 header ! Juste une archive vide.
+            num_headers = 0; 
+        } 
+        else if (chance < 40) {
+            // 30% de chance : 1 seul header
+            num_headers = 1;
             generate_header(&headers[0]);
-        } else {
-            // Stratégie 2 : Deux fichiers (1 appât sain + 1 piège fuzzed)
+        } 
+        else if (chance < 70) {
+            // 30% de chance : 2 headers (L'attaque de l'appât)
+            num_headers = 2;
             baseline_header(&headers[0]);
             strncpy(headers[0].name, "appat.txt", 100); 
             generate_header(&headers[1]);
+        } 
+        else {
+            // 30% de chance : L'INVASION MASSIVE (entre 10 et 100 headers)
+            num_headers = (rand() % 91) + 10; 
+            for (int i = 0; i < num_headers; i++) {
+                if (i % 2 == 0) {
+                    baseline_header(&headers[i]); // On alterne le chaud...
+                    snprintf(headers[i].name, 100, "appat_%d.txt", i);
+                } else {
+                    generate_header(&headers[i]); // ... et le froid !
+                }
+            }
         }
 
-        // On génère l'archive avec le bon nombre de fichiers
-        create_tar(headers, num_headers);
+        // On génère l'archive
+        create_tar(headers, num_headers); // Assure-toi que cette fonction s'appelle bien create_tar ou create_multi_tar selon ce que tu as gardé
 
         // On exécute l'extracteur dessus
         int result = extractor(argv[1]);
