@@ -1,9 +1,16 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include "utils.h"
 #include "tar.h"
 #include "executor.h"
-#include <stdlib.h>
+#include "fuzzer.h"
+
+// Forward declarations for internal functions
+static void write_body(FILE *tar);
+static void generate_random_bytes(char* buf, size_t size);
+static void fill_naughty_string(char *dest, size_t size);
+static void fill_naughty_octal(char *dest, size_t size);
 
 // Naughty strings for text fields (name, linkname, uname, gname)
 const char* naughty_strings[] = {
@@ -51,18 +58,22 @@ void create_tar(struct tar_t *headers, int num_headers) {
         struct tar_t ghost_header;
         baseline_header(&ghost_header);
         
-        strncpy(ghost_header.name, "../../../../../etc/shadow", 100);
+        strncpy(ghost_header.name, "fantome.txt", 100);
         strncpy(ghost_header.size, "00000007777", 12);
         calculate_checksum(&ghost_header);
         
         fwrite(&ghost_header, sizeof(struct tar_t), 1, tar);
+
+        //To test : 1024 // 512 bytes
+        char padding[1024] = {0};
+        fwrite(padding, 1, 1024, tar);
     }
 
     fclose(tar);
 }
 
 // Body generator
-void write_body(FILE *tar) {
+static void write_body(FILE *tar) {
     if (rand() % 2 != 0) {
         return;
     }
@@ -98,14 +109,14 @@ void baseline_header(struct tar_t* entry) {
     strncpy(entry->mtime, "00000000000", 12);
     entry->typeflag = '0';
     strncpy(entry->magic, "ustar", 6);
-    strncpy(entry->version, "00", 2);
+    memcpy(entry->version, "00", 2);
     strncpy(entry->uname, "fuzzer", 32);
     strncpy(entry->gname, "fuzzer", 32);
 
     calculate_checksum(entry);
 }
 
-void generate_random_bytes(char* buf, size_t size) {
+static void generate_random_bytes(char* buf, size_t size) {
     for (size_t i = 0; i < size; i++) {
         
         buf[i] = rand() % 256; // Completely random byte
@@ -113,7 +124,7 @@ void generate_random_bytes(char* buf, size_t size) {
     }
 }
 
-void fill_naughty_string(char *dest, size_t size) {
+static void fill_naughty_string(char *dest, size_t size) {
     int choice = rand() % (NUM_NAUGHTY_STRINGS + 1);
     if (choice < NUM_NAUGHTY_STRINGS) {
         strncpy(dest, naughty_strings[choice], size);
@@ -123,9 +134,11 @@ void fill_naughty_string(char *dest, size_t size) {
     }
 }
 
-void fill_naughty_octal(char *dest, size_t size) {
+static void fill_naughty_octal(char *dest, size_t size) {
     int choice = rand() % NUM_NAUGHTY_OCTALS;
-    strncpy(dest, naughty_octals[choice], size);
+    size_t len = strlen(naughty_octals[choice]);
+    if (len > size) len = size;
+    memcpy(dest, naughty_octals[choice], len);
 }
 
 // Generation-based approach
@@ -156,7 +169,7 @@ void generate_header(struct tar_t* entry) {
     // Magic and Version
     if (rand() % 2 == 0) {
         strncpy(entry->magic, "ustar", 6); // Valid magic
-        strncpy(entry->version, "00", 2);
+        memcpy(entry->version, "00", 2);
     } else {
         fill_naughty_string(entry->magic, sizeof(entry->magic));
     }

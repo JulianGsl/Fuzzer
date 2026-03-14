@@ -1,3 +1,6 @@
+#ifndef TAR_H
+#define TAR_H
+
 #include <stdio.h>
 #include <string.h>
 
@@ -21,3 +24,5 @@ struct tar_t
     char prefix[155];             /* 345 */
     char padding[12];             /* 500 */
 };
+
+#endif
