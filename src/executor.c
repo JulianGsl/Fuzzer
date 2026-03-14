@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
 #include <string.h>
 
@@ -15,9 +16,9 @@
 int extractor(const char* extractor_path)
 {
     int rv = 0;
-    char cmd[51];
+    char cmd[51] = {0};// = {0} to initialize the array with null characters
     strncpy(cmd, extractor_path, 25);
-    cmd[26] = '\0';
+    //cmd[26] = '\0';
     strncat(cmd, " archive.tar", 25);
     char buf[33];
     FILE *fp;
