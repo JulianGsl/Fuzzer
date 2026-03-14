@@ -38,6 +38,16 @@ int main(int argc, char* argv[])
 
         if (result == 1) {
             printf("\n*** Success! Crash triggered after %d generations! ***\n", attempts);
+            
+            char filename[256];
+            snprintf(filename, sizeof(filename), "success_%d.tar", attempts);
+            
+            char sys_cmd[512];
+            snprintf(sys_cmd, sizeof(sys_cmd), "cp archive.tar %s", filename);
+            int sys_ret = system(sys_cmd);
+            (void)sys_ret; // suppress warning
+            printf("Saved crashing payload to %s\n", filename);
+            
             crash_found = 1;
         } else if (result == -1) {
             printf("\nExtractor failed (target program error). Stopping.\n");
