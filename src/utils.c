@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include "tar.h"
 
 /**
  * Computes the checksum for a tar header and encode it on the header

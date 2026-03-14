@@ -1,0 +1,1 @@
+unsigned int calculate_checksum(struct tar_t* entry);

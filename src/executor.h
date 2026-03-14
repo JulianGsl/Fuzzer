@@ -1,0 +1,1 @@
+int extractor(const char* extractor_path);
