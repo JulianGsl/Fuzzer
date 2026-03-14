@@ -27,25 +27,8 @@ const char* naughty_octals[] = {
 };
 #define NUM_NAUGHTY_OCTALS 7
 
-// Create the TAR file
-void create_tar(struct tar_t *header) {
-    calculate_checksum(header);
-
-    FILE *tar = fopen("archive.tar", "wb");
-    if (tar == NULL) {
-        perror("Error while trying to create the tar file");
-        return;
-    }
-    fwrite(header, sizeof(struct tar_t), 1, tar);
-
-    char padding[1024] = {0};
-    fwrite(padding, 1, 1024, tar);
-
-    fclose(tar);
-}
-
-// Create a TAR file with multiple headers
-void create_multi_tar(struct tar_t *headers, int num_headers) {
+// Create a TAR file with one or more headers
+void create_tar(struct tar_t *headers, int num_headers) {
     FILE *tar = fopen("archive.tar", "wb");
     if (tar == NULL) {
         perror("Error while trying to create the tar file");

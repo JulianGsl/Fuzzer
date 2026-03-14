@@ -43,7 +43,7 @@ if (argc < 2) {
         }
 
         // On génère l'archive avec le bon nombre de fichiers
-        create_multi_tar(headers, num_headers);
+        create_tar(headers, num_headers);
 
         // On exécute l'extracteur dessus
         int result = extractor(argv[1]);
