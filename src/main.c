@@ -30,34 +30,46 @@ if (argc < 2) {
         struct tar_t headers[100];
         int num_headers = 0;
         
-        // Tirage au sort stratégique (Probabilités)
-        int chance = rand() % 100; 
+        // Tirage au sort stratégique
+        int chance = rand() % 100;
 
-        if (chance < 10) {
-            // 10% de chance : 0 header ! Juste une archive vide.
-            num_headers = 0; 
-        } 
-        else if (chance < 40) {
-            // 30% de chance : 1 seul header
+        if (chance < 5) {
+            num_headers = 0;
+        }
+        else if (chance < 35) {
             num_headers = 1;
             generate_header(&headers[0]);
-        } 
-        else if (chance < 70) {
-            // 30% de chance : 2 headers (L'attaque de l'appât)
+        }
+        else if (chance < 55) {
             num_headers = 2;
             baseline_header(&headers[0]);
-            strncpy(headers[0].name, "appat.txt", 100); 
+            strncpy(headers[0].name, "legit.txt", 100);
             generate_header(&headers[1]);
-        } 
+        }
+        else if (chance < 70) {
+            num_headers = 3;
+            baseline_header(&headers[0]);
+            strncpy(headers[0].name, "first.txt", 100);
+            baseline_header(&headers[1]);
+            strncpy(headers[1].name, "second.txt", 100);
+            generate_header(&headers[2]);
+        }
+        else if (chance < 85) {
+            num_headers = (rand() % 8) + 3;
+            for (int i = 0; i < num_headers - 1; i++) {
+                baseline_header(&headers[i]);
+                snprintf(headers[i].name, 100, "file_%d.txt", i);
+            }
+            generate_header(&headers[num_headers - 1]);
+        }
         else {
-            // 30% de chance : L'INVASION MASSIVE (entre 10 et 100 headers)
-            num_headers = (rand() % 91) + 10; 
+            num_headers = (rand() % 50) + 10;
             for (int i = 0; i < num_headers; i++) {
-                if (i % 2 == 0) {
-                    baseline_header(&headers[i]); // On alterne le chaud...
-                    snprintf(headers[i].name, 100, "appat_%d.txt", i);
-                } else {
-                    generate_header(&headers[i]); // ... et le froid !
+                if (rand() % 3 == 0)
+                    generate_header(&headers[i]);
+                else {
+                    baseline_header(&headers[i]);
+                    snprintf(headers[i].name, 100, "bulk_%d.txt", i);
                 }
             }
         }

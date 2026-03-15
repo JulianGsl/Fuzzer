@@ -11,28 +11,36 @@ static void generate_random_bytes(char* buf, size_t size);
 static void fill_naughty_string(char *dest, size_t size);
 static void fill_naughty_octal(char *dest, size_t size);
 
-// Naughty strings for text fields (name, linkname, uname, gname)
 const char* naughty_strings[] = {
-    "",                                     // Empty
-    "%s%n%s%n%s%n%s%n",                     // Format string vulnerability
-    ".././/////////../../../../../etc/passwd", // Path traversal
-    "A",                                    // Very short
+    "",
+    "%s%n%s%n%x%x",
+    "%n%n%n%n",
+    "../../../../../../etc/passwd",
+    "../../../tmp/pwned",
+    "/etc/shadow",
+    "A",
+    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "\x00hidden",
+    "normal\x00hidden",
 };
-#define NUM_NAUGHTY_STRINGS 4
+#define NUM_NAUGHTY_STRINGS 10
 
-// Naughty octal strings for numeric fields (mode, uid, gid, size, mtime)
 const char* naughty_octals[] = {
     "",
     "0000000",
-    "77777777777777777777", // Waaaaay too large
-    "-1",                   // Negative
-    "9999999",              // Invalid octal
-    "%s%x%n",               // Format string just in case
-    "A",                    // Not a number at all
+    "77777777777",
+    "37777777777",
+    "777777777777777777",
+    "-1",
+    "-99999999",
+    "9999999",
+    "%s%x%n",
+    "A",
+    "\x00\x00\x00\x00",
+    "0000001",
 };
-#define NUM_NAUGHTY_OCTALS 7
+#define NUM_NAUGHTY_OCTALS 12
 
-// Create a TAR file with one or more headers
 void create_tar(struct tar_t *headers, int num_headers) {
     FILE *tar = fopen("archive.tar", "wb");
     if (tar == NULL) {
@@ -40,57 +48,90 @@ void create_tar(struct tar_t *headers, int num_headers) {
         return;
     }
 
-    for(int i = 0; i < num_headers; i++) {
-        calculate_checksum(&headers[i]); 
+    int truncate_at = -1;
+    if (rand() % 8 == 0 && num_headers > 0) {
+        truncate_at = rand() % num_headers;
+    }
+
+    for (int i = 0; i < num_headers; i++) {
+        calculate_checksum(&headers[i]);
         fwrite(&headers[i], sizeof(struct tar_t), 1, tar);
+
+        if (truncate_at == i) {
+            fclose(tar);
+            return;
+        }
+
         write_body(tar);
     }
 
-    int random_padding = rand() % 3;
-    
-    if (random_padding == 0) {
+    int ending = rand() % 5;
+    if (ending == 0) {
         char padding[1024] = {0};
         fwrite(padding, 1, 1024, tar);
     }
-    else if (random_padding == 1) {
-        struct tar_t ghost_header;
-        baseline_header(&ghost_header);
-        
-        strncpy(ghost_header.name, "fantome.txt", 100);
-        strncpy(ghost_header.size, "00000007777", 12);
-        calculate_checksum(&ghost_header);
-        
-        fwrite(&ghost_header, sizeof(struct tar_t), 1, tar);
-
-        //To test : 1024 // 512 bytes
-        char padding[1024] = {0};
-        fwrite(padding, 1, 1024, tar);
+    else if (ending == 1) {
+        struct tar_t ghost;
+        baseline_header(&ghost);
+        strncpy(ghost.name, "ghost.txt", 100);
+        strncpy(ghost.size, "00000077777", 12);
+        calculate_checksum(&ghost);
+        fwrite(&ghost, sizeof(struct tar_t), 1, tar);
+        char pad[512] = {0};
+        fwrite(pad, 1, 512, tar);
+    }
+    else if (ending == 2) {
+        char garbage[256];
+        for (int i = 0; i < 256; i++)
+            garbage[i] = rand() % 256;
+        fwrite(garbage, 1, 256, tar);
     }
 
     fclose(tar);
 }
 
-// Body generator
 static void write_body(FILE *tar) {
-    if (rand() % 2 != 0) {
+    int choice = rand() % 6;
+
+    if (choice == 0 || choice == 1) {
         return;
     }
 
-    int data_size = (rand() % 4096) + 1;
-    char *body_data = malloc(data_size);
-    
-    if (body_data != NULL) {
-        generate_random_bytes(body_data, data_size);
-        fwrite(body_data, 1, data_size, tar);
-        free(body_data);
-
-        if (rand() % 4 != 0) { 
-            int remainder = data_size % 512;
-            if (remainder > 0) {
-                int pad_size = 512 - remainder;
+    if (choice == 2) {
+        int data_size = (rand() % 2048) + 1;
+        char *body = malloc(data_size);
+        if (body) {
+            generate_random_bytes(body, data_size);
+            fwrite(body, 1, data_size, tar);
+            free(body);
+            int rem = data_size % 512;
+            if (rem > 0) {
                 char pad[512] = {0};
-                fwrite(pad, 1, pad_size, tar);
+                fwrite(pad, 1, 512 - rem, tar);
             }
+        }
+    }
+    else if (choice == 3) {
+        int data_size = (rand() % 1024) + 512;
+        char *body = malloc(data_size);
+        if (body) {
+            generate_random_bytes(body, data_size);
+            fwrite(body, 1, data_size, tar);
+            free(body);
+        }
+    }
+    else if (choice == 4) {
+        char small[64];
+        generate_random_bytes(small, 64);
+        fwrite(small, 1, 64, tar);
+    }
+    else {
+        int huge = 10000 + (rand() % 5000);
+        char *body = malloc(huge);
+        if (body) {
+            generate_random_bytes(body, huge);
+            fwrite(body, 1, huge, tar);
+            free(body);
         }
     }
 }
@@ -123,17 +164,21 @@ static void generate_random_bytes(char* buf, size_t size) {
 }
 
 static void fill_naughty_string(char *dest, size_t size) {
-    int choice = rand() % (NUM_NAUGHTY_STRINGS + 1);
+    int choice = rand() % (NUM_NAUGHTY_STRINGS + 2);
+
     if (choice < NUM_NAUGHTY_STRINGS) {
         strncpy(dest, naughty_strings[choice], size);
-    } else {
-        // fill entirely with 'A's
+    } else if (choice == NUM_NAUGHTY_STRINGS) {
         memset(dest, 'A', size);
+        return; // pas de null terminator !
+    } else {
+        for (size_t i = 0; i < size; i++)
+            dest[i] = 'A' + (rand() % 26);
+        return; // pas de null terminator non plus
     }
-    // Force null-termination
-    if (size > 0) {
+
+    if (rand() % 3 == 0 && size > 0)
         dest[size - 1] = '\0';
-    }
 }
 
 static void fill_naughty_octal(char *dest, size_t size) {
@@ -143,39 +188,121 @@ static void fill_naughty_octal(char *dest, size_t size) {
     memcpy(dest, naughty_octals[choice], len);
 }
 
-// Generation-based approach
-//regarder ici pour trouver des façons de crash les extracteurs
 void generate_header(struct tar_t* entry) {
-    //comprendre la structure du header
     memset(entry, 0, sizeof(struct tar_t));
 
-    // fuzzing text fields
-    fill_naughty_string(entry->name, sizeof(entry->name));
-    fill_naughty_string(entry->linkname, sizeof(entry->linkname));
-    fill_naughty_string(entry->uname, sizeof(entry->uname));
-    fill_naughty_string(entry->gname, sizeof(entry->gname));
+    int strategy = rand() % 10;
 
-    // fuzzing numeric fields
-    fill_naughty_octal(entry->mode, sizeof(entry->mode));
-    fill_naughty_octal(entry->uid, sizeof(entry->uid));
-    fill_naughty_octal(entry->gid, sizeof(entry->gid));
-    //try something on size later
-    fill_naughty_octal(entry->size, sizeof(entry->size)); 
-    fill_naughty_octal(entry->mtime, sizeof(entry->mtime));
-
-    // try all typeflag
-    char flags[] = {'0', '1', '2', '3', '4', '5', '6', '7', 'A', '\0', (char)255};
-    entry->typeflag = flags[rand() % 11];
-
-    // Magic and Version
-    if (rand() % 2 == 0) {
-        strncpy(entry->magic, "ustar", 6); // Valid magic
+    if (strategy == 0) {
+        fill_naughty_string(entry->name, sizeof(entry->name));
+        strncpy(entry->mode, "0000644", 8);
+        strncpy(entry->uid, "0000000", 8);
+        strncpy(entry->gid, "0000000", 8);
+        strncpy(entry->size, "00000000000", 12);
+        strncpy(entry->mtime, "00000000000", 12);
+        entry->typeflag = '0';
+        strncpy(entry->magic, "ustar", 6);
         memcpy(entry->version, "00", 2);
-    } else {
-        fill_naughty_string(entry->magic, sizeof(entry->magic));
+    }
+    else if (strategy == 1) {
+        strncpy(entry->name, "overflow_test.txt", 100);
+        strncpy(entry->mode, "0000644", 8);
+        strncpy(entry->uid, "0000000", 8);
+        strncpy(entry->gid, "0000000", 8);
+
+        const char* big_sizes[] = {"37777777777", "77777777777", "999999999999", "-0000000001"};
+        memcpy(entry->size, big_sizes[rand() % 4], 12);
+
+        strncpy(entry->mtime, "00000000000", 12);
+        entry->typeflag = '0';
+        strncpy(entry->magic, "ustar", 6);
+        memcpy(entry->version, "00", 2);
+    }
+    else if (strategy == 2) {
+        strncpy(entry->name, "../../../../../../tmp/escape", 100);
+        strncpy(entry->linkname, "/etc/passwd", 100);
+        strncpy(entry->mode, "0000777", 8);
+        strncpy(entry->uid, "0000000", 8);
+        strncpy(entry->gid, "0000000", 8);
+        strncpy(entry->size, "00000000000", 12);
+        strncpy(entry->mtime, "00000000000", 12);
+        entry->typeflag = (rand() % 2) ? '1' : '2';
+        strncpy(entry->magic, "ustar", 6);
+        memcpy(entry->version, "00", 2);
+    }
+    else if (strategy == 3) {
+        memset(entry->name, 'X', 100);
+        memset(entry->linkname, 'Y', 100);
+        memset(entry->uname, 'Z', 32);
+        memset(entry->gname, 'W', 32);
+        strncpy(entry->mode, "0000644", 8);
+        strncpy(entry->uid, "0000000", 8);
+        strncpy(entry->gid, "0000000", 8);
+        strncpy(entry->size, "00000000000", 12);
+        strncpy(entry->mtime, "00000000000", 12);
+        entry->typeflag = '0';
+        strncpy(entry->magic, "ustar", 6);
+        memcpy(entry->version, "00", 2);
+    }
+    else if (strategy == 4) {
+        entry->name[0] = '\0';
+        strncpy(entry->mode, "0000644", 8);
+        strncpy(entry->uid, "0000000", 8);
+        strncpy(entry->gid, "0000000", 8);
+        strncpy(entry->size, "00000000000", 12);
+        strncpy(entry->mtime, "00000000000", 12);
+        entry->typeflag = '0';
+        strncpy(entry->magic, "ustar", 6);
+        memcpy(entry->version, "00", 2);
+    }
+    else if (strategy == 5) {
+        strncpy(entry->name, "weird_dir", 100);
+        strncpy(entry->mode, "0000755", 8);
+        strncpy(entry->uid, "0000000", 8);
+        strncpy(entry->gid, "0000000", 8);
+        strncpy(entry->size, "00000001000", 12);
+        strncpy(entry->mtime, "00000000000", 12);
+        entry->typeflag = '5';
+        strncpy(entry->magic, "ustar", 6);
+        memcpy(entry->version, "00", 2);
+    }
+    else if (strategy == 6) {
+        snprintf(entry->name, 100, "%%s%%s%%n%%x");
+        snprintf(entry->uname, 32, "%%n%%n%%n%%n");
+        strncpy(entry->mode, "0000644", 8);
+        strncpy(entry->uid, "0000000", 8);
+        strncpy(entry->gid, "0000000", 8);
+        strncpy(entry->size, "00000000000", 12);
+        strncpy(entry->mtime, "00000000000", 12);
+        entry->typeflag = '0';
+        strncpy(entry->magic, "ustar", 6);
+        memcpy(entry->version, "00", 2);
+    }
+    else {
+        fill_naughty_string(entry->name, sizeof(entry->name));
+        fill_naughty_string(entry->linkname, sizeof(entry->linkname));
+        fill_naughty_string(entry->uname, sizeof(entry->uname));
+        fill_naughty_string(entry->gname, sizeof(entry->gname));
+        fill_naughty_octal(entry->mode, sizeof(entry->mode));
+        fill_naughty_octal(entry->uid, sizeof(entry->uid));
+        fill_naughty_octal(entry->gid, sizeof(entry->gid));
+        fill_naughty_octal(entry->size, sizeof(entry->size));
+        fill_naughty_octal(entry->mtime, sizeof(entry->mtime));
+
+        char flags[] = {'0', '1', '2', '3', '4', '5', '6', '7', 'A', 'g', '\0', (char)0x90, (char)255};
+        entry->typeflag = flags[rand() % 13];
+
+        if (rand() % 2 == 0) {
+            strncpy(entry->magic, "ustar", 6);
+            memcpy(entry->version, "00", 2);
+        } else {
+            fill_naughty_string(entry->magic, sizeof(entry->magic));
+        }
     }
 
-    
-
-    calculate_checksum(entry);
+    if (rand() % 5 == 0) {
+        memset(entry->chksum, 'A', 8);
+    } else {
+        calculate_checksum(entry);
+    }
 }
