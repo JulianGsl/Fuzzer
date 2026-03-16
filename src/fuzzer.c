@@ -132,6 +132,10 @@ static void fill_naughty_string(char *dest, size_t size) {
         // Create an unterminated string (fill entirely with 'A's)
         memset(dest, 'A', size);
     }
+    // Force null-termination so fields are always properly closed
+    if (size > 0) {
+        dest[size - 1] = '\0';
+    }
 }
 
 static void fill_naughty_octal(char *dest, size_t size) {
