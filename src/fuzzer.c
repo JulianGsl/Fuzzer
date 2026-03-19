@@ -6,7 +6,6 @@
 #include "executor.h"
 #include "fuzzer.h"
 
-// Forward declarations for internal functions
 static void write_body(FILE *tar);
 static void generate_random_bytes(char* buf, size_t size);
 static void fill_naughty_string(char *dest, size_t size);
@@ -18,7 +17,6 @@ const char* naughty_strings[] = {
     "%s%n%s%n%s%n%s%n",                     // Format string vulnerability
     ".././/////////../../../../../etc/passwd", // Path traversal
     "A",                                    // Very short
-    // We will dynamically generate a string of exactly 100 'A's without a \0
 };
 #define NUM_NAUGHTY_STRINGS 4
 
@@ -28,7 +26,7 @@ const char* naughty_octals[] = {
     "0000000",
     "77777777777777777777", // Waaaaay too large
     "-1",                   // Negative
-    "9999999",              // Invalid octal (contains 9)
+    "9999999",              // Invalid octal
     "%s%x%n",               // Format string just in case
     "A",                    // Not a number at all
 };
@@ -129,10 +127,10 @@ static void fill_naughty_string(char *dest, size_t size) {
     if (choice < NUM_NAUGHTY_STRINGS) {
         strncpy(dest, naughty_strings[choice], size);
     } else {
-        // Create an unterminated string (fill entirely with 'A's)
+        // fill entirely with 'A's
         memset(dest, 'A', size);
     }
-    // Force null-termination so fields are always properly closed
+    // Force null-termination
     if (size > 0) {
         dest[size - 1] = '\0';
     }
@@ -151,22 +149,21 @@ void generate_header(struct tar_t* entry) {
     //comprendre la structure du header
     memset(entry, 0, sizeof(struct tar_t));
 
-    // Smart-fuzzing text fields
+    // fuzzing text fields
     fill_naughty_string(entry->name, sizeof(entry->name));
     fill_naughty_string(entry->linkname, sizeof(entry->linkname));
     fill_naughty_string(entry->uname, sizeof(entry->uname));
     fill_naughty_string(entry->gname, sizeof(entry->gname));
 
-    // Smart-fuzzing octal/numeric fields
+    // fuzzing numeric fields
     fill_naughty_octal(entry->mode, sizeof(entry->mode));
     fill_naughty_octal(entry->uid, sizeof(entry->uid));
     fill_naughty_octal(entry->gid, sizeof(entry->gid));
-    // Size is special - if it's too big, our fuzzer might try to write a huge file later.
-    // For now, keep it to a naught octal or reasonable size
+    //try something on size later
     fill_naughty_octal(entry->size, sizeof(entry->size)); 
     fill_naughty_octal(entry->mtime, sizeof(entry->mtime));
 
-    // Typeflag (common values are '0' for normal file, '5' for directory, etc.)
+    // try all typeflag
     char flags[] = {'0', '1', '2', '3', '4', '5', '6', '7', 'A', '\0', (char)255};
     entry->typeflag = flags[rand() % 11];
 
@@ -178,8 +175,7 @@ void generate_header(struct tar_t* entry) {
         fill_naughty_string(entry->magic, sizeof(entry->magic));
     }
 
-    // Explicitly ignore devmajor, devminor, prefix as instructed
-    // (they remain 0 because of the memset)
+    
 
     calculate_checksum(entry);
 }

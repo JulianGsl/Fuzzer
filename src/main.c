@@ -63,7 +63,7 @@ if (argc < 2) {
         }
 
         // On génère l'archive
-        create_tar(headers, num_headers); // Assure-toi que cette fonction s'appelle bien create_tar ou create_multi_tar selon ce que tu as gardé
+        create_tar(headers, num_headers);
 
         // On exécute l'extracteur dessus
         int result = extractor(argv[1]);
